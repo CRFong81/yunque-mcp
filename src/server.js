@@ -300,17 +300,85 @@ async function handleMcp(req, res) {
 }
 
 // Ruta con cabecera Authorization: Bearer <secreto>
-// --- CABINA: tablero visual ---
+// --- CABINA: PWA instalable ---
 const CABINA = fs.readFileSync(path.join(__dirname, "cabina.html"), "utf8");
 
+const okSecret = (req) => !MCP_SECRET || req.params.secret === MCP_SECRET;
+
+// sin barra final -> redirige (necesario para que el scope del SW cubra la app)
 app.get("/cabina/:secret", (req, res) => {
-  if (MCP_SECRET && req.params.secret !== MCP_SECRET) return res.status(401).send("No autorizado");
+  if (!okSecret(req)) return res.status(401).send("No autorizado");
+  res.redirect(302, `/cabina/${req.params.secret}/`);
+});
+
+app.get("/cabina/:secret/", (req, res) => {
+  if (!okSecret(req)) return res.status(401).send("No autorizado");
   res.type("html").send(CABINA);
 });
 
-app.post("/cabina-api/:secret", async (req, res) => {
-  if (MCP_SECRET && req.params.secret !== MCP_SECRET)
-    return res.status(401).json({ error: "No autorizado" });
+// Manifiesto: lo que convierte la pagina en app instalable
+app.get("/cabina/:secret/manifest.webmanifest", (req, res) => {
+  if (!okSecret(req)) return res.status(401).end();
+  res.type("application/manifest+json").json({
+    name: "Yunque",
+    short_name: "Yunque",
+    description: "La fragua de Cesar — control de Yunque",
+    start_url: "./",
+    scope: "./",
+    display: "standalone",
+    orientation: "portrait",
+    background_color: "#0b0d12",
+    theme_color: "#0b0d12",
+    icons: [
+      { src: "icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "icons/maskable-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
+      { src: "icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+    ],
+  });
+});
+
+// Service worker: cachea el caparazon para que abra al instante
+app.get("/cabina/:secret/sw.js", (req, res) => {
+  if (!okSecret(req)) return res.status(401).end();
+  res.type("application/javascript").send(`
+const CACHE = "yunque-v1";
+self.addEventListener("install", (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["./"])).then(() => self.skipWaiting()));
+});
+self.addEventListener("activate", (e) => {
+  e.waitUntil(caches.keys().then((ks) =>
+    Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+  ).then(() => self.clients.claim()));
+});
+self.addEventListener("fetch", (e) => {
+  const url = new URL(e.request.url);
+  // los datos SIEMPRE frescos de la red; nunca cacheados
+  if (e.request.method !== "GET" || url.pathname.endsWith("/api")) return;
+  e.respondWith(
+    fetch(e.request)
+      .then((r) => {
+        const copy = r.clone();
+        caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+        return r;
+      })
+      .catch(() => caches.match(e.request).then((m) => m || caches.match("./")))
+  );
+});
+`);
+});
+
+app.get("/cabina/:secret/icons/:file", (req, res) => {
+  if (!okSecret(req)) return res.status(401).end();
+  const f = path.basename(req.params.file);
+  const p = path.join(__dirname, "icons", f);
+  if (!fs.existsSync(p)) return res.status(404).end();
+  res.type("png").sendFile(p);
+});
+
+// API de la cabina
+const cabinaApi = async (req, res) => {
+  if (!okSecret(req)) return res.status(401).json({ error: "No autorizado" });
   const tool = TOOLS.find((t) => t.name === req.body?.tool);
   if (!tool) return res.status(404).json({ error: "Herramienta desconocida" });
   try {
@@ -318,7 +386,9 @@ app.post("/cabina-api/:secret", async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
-});
+};
+app.post("/cabina/:secret/api", cabinaApi);
+app.post("/cabina-api/:secret", cabinaApi); // compatibilidad
 
 app.post("/mcp", handleMcp);
 
