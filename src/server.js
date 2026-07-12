@@ -247,6 +247,7 @@ const TOOLS = [
 
 // ---------------- transporte ----------------
 const app = express();
+app.set("strict routing", true); // distingue /cabina/x de /cabina/x/ (necesario para el scope del SW)
 app.use(express.json({ limit: "5mb" }));
 
 app.get("/", (_req, res) =>
