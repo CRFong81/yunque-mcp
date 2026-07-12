@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<title>YUNQUE</title>
+<style>
+  :root{
+    --bg:#0b0d12; --panel:#12151d; --panel2:#171b25; --line:#232838;
+    --txt:#e8eaf0; --dim:#7c8497; --fire:#ff6b1a; --ember:#ffa24d;
+    --ok:#33d69f; --warn:#ffcc4d; --bad:#ff5c5c;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{
+    background:var(--bg); color:var(--txt);
+    font-family:var(--mono); font-size:15px;
+    padding-bottom:calc(78px + env(safe-area-inset-bottom));
+    min-height:100vh;
+  }
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 18px 14px; border-bottom:1px solid var(--line);
+    position:sticky; top:0; background:rgba(11,13,18,.94);
+    backdrop-filter:blur(12px); z-index:10;
+  }
+  .brand{display:flex;align-items:center;gap:11px}
+  .brand h1{
+    font-size:22px; letter-spacing:.22em; font-weight:700;
+    background:linear-gradient(180deg,#fff,#c9cede);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  }
+  .hammer{font-size:22px;filter:drop-shadow(0 0 8px rgba(255,107,26,.55))}
+  .pulse{
+    display:flex;align-items:center;gap:7px;
+    font-size:11px;letter-spacing:.1em;padding:7px 12px;
+    border-radius:99px;border:1px solid var(--line);background:var(--panel);
+  }
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--dim)}
+  .dot.on{background:var(--ok);box-shadow:0 0 0 0 rgba(51,214,159,.6);animation:beat 2s infinite}
+  .dot.off{background:var(--bad);box-shadow:0 0 10px rgba(255,92,92,.7)}
+  @keyframes beat{0%{box-shadow:0 0 0 0 rgba(51,214,159,.55)}70%{box-shadow:0 0 0 9px rgba(51,214,159,0)}100%{box-shadow:0 0 0 0 rgba(51,214,159,0)}}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--line)}
+  .stat{padding:16px 6px;text-align:center;border-right:1px solid var(--line)}
+  .stat:last-child{border-right:0}
+  .stat .n{font-size:24px;font-weight:700;line-height:1.1}
+  .stat .l{font-size:9px;letter-spacing:.14em;color:var(--dim);margin-top:5px}
+  .fire{color:var(--fire)} .good{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+
+  main{padding:16px 14px}
+  .card{
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:14px; padding:14px; margin-bottom:11px;
+  }
+  .card.live{border-color:var(--fire);box-shadow:0 0 22px rgba(255,107,26,.13)}
+  .row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .t{font-size:14px;font-weight:600;line-height:1.35;flex:1}
+  .meta{font-size:11px;color:var(--dim);margin-top:7px;display:flex;flex-wrap:wrap;gap:9px}
+  .tag{
+    font-size:9.5px;letter-spacing:.09em;padding:4px 9px;border-radius:99px;
+    border:1px solid var(--line);white-space:nowrap;flex-shrink:0;
+  }
+  .tag.run{border-color:var(--fire);color:var(--fire);background:rgba(255,107,26,.09)}
+  .tag.done{border-color:var(--ok);color:var(--ok)}
+  .tag.err{border-color:var(--bad);color:var(--bad)}
+  .tag.pend{border-color:var(--warn);color:var(--warn)}
+
+  .bar{height:5px;background:var(--panel2);border-radius:99px;overflow:hidden;margin-top:9px}
+  .fill{height:100%;background:linear-gradient(90deg,var(--fire),var(--ember));border-radius:99px;transition:width .5s}
+
+  .empty{text-align:center;color:var(--dim);padding:44px 20px;font-size:13px;line-height:1.7}
+  .err-box{
+    border:1px solid var(--bad);color:var(--bad);background:rgba(255,92,92,.07);
+    border-radius:12px;padding:14px;text-align:center;font-size:12.5px;line-height:1.6
+  }
+  .sec{font-size:10px;letter-spacing:.16em;color:var(--dim);margin:20px 2px 10px}
+
+  nav{
+    position:fixed;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(4,1fr);
+    background:rgba(18,21,29,.97);backdrop-filter:blur(14px);border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom);z-index:20;
+  }
+  nav button{
+    background:none;border:0;color:var(--dim);padding:13px 4px 15px;
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:5px;position:relative;
+  }
+  nav button .i{font-size:19px;filter:grayscale(1);opacity:.55;transition:.2s}
+  nav button.on{color:var(--fire)}
+  nav button.on .i{filter:none;opacity:1}
+  nav button.on::before{
+    content:"";position:absolute;top:0;left:26%;right:26%;height:2.5px;
+    background:var(--fire);border-radius:0 0 3px 3px;
+  }
+  .spin{display:inline-block;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .ref{
+    background:var(--panel);border:1px solid var(--line);color:var(--dim);
+    width:38px;height:38px;border-radius:11px;font-size:15px;cursor:pointer;
+  }
+  .ref:active{color:var(--fire);border-color:var(--fire)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><span class="hammer">⚒</span><h1>YUNQUE</h1></div>
+  <div style="display:flex;gap:9px;align-items:center">
+    <div class="pulse"><span class="dot" id="dot"></span><span id="pulseTxt">…</span></div>
+    <button class="ref" id="ref">⟳</button>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="stat"><div class="n fire" id="sAct">–</div><div class="l">ACTIVAS</div></div>
+  <div class="stat"><div class="n warn" id="sCola">–</div><div class="l">EN COLA</div></div>
+  <div class="stat"><div class="n" id="sMps">–</div><div class="l">MPs</div></div>
+  <div class="stat"><div class="n good" id="sCosto">–</div><div class="l">COSTO 24H</div></div>
+</div>
+
+<main id="view"><div class="empty"><span class="spin">⚒</span><br><br>Cargando la fragua…</div></main>
+
+<nav>
+  <button class="on" data-t="flota"><span class="i">🔥</span>FLOTA</button>
+  <button data-t="tareas"><span class="i">📋</span>TAREAS</button>
+  <button data-t="proyectos"><span class="i">📐</span>PROYECTOS</button>
+  <button data-t="eventos"><span class="i">📡</span>BITÁCORA</button>
+</nav>
+
+<script>
+const API = location.pathname.replace(/\/cabina.*$/, '') + '/cabina-api' + location.pathname.match(/\/cabina\/([^\/]+)/)[0].replace('/cabina','');
+let tab = 'flota', data = {}, timer = null;
+
+async function call(tool, args={}) {
+  const r = await fetch(API, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ tool, args })
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return await r.json();
+}
+
+const ago = s => s==null ? '–' : s<60 ? s+'s' : s<3600 ? Math.floor(s/60)+'m' : Math.floor(s/3600)+'h';
+const when = t => {
+  if(!t) return '–';
+  const d = Math.floor((Date.now()-new Date(t))/1000);
+  return d<60?'ahora':d<3600?Math.floor(d/60)+'m':d<86400?Math.floor(d/3600)+'h':Math.floor(d/86400)+'d';
+};
+const esc = s => String(s??'').replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+
+async function load() {
+  try {
+    const [est, jobs, tar, pro, ev] = await Promise.all([
+      call('estado'), call('jobs',{limite:25}), call('tareas'),
+      call('proyectos'), call('eventos',{limite:25})
+    ]);
+    data = { est, jobs: jobs.jobs||[], tareas: tar.tareas||[], proyectos: pro.proyectos||[], eventos: ev.eventos||[] };
+    paintHeader(); render();
+  } catch(e) {
+    document.getElementById('view').innerHTML =
+      `<div class="err-box">No pude alcanzar la fragua.<br><span style="color:var(--dim)">${esc(e.message)}</span></div>`;
+  }
+}
+
+function paintHeader() {
+  const e = data.est, r = e.runner || {};
+  const dot = document.getElementById('dot');
+  dot.className = 'dot ' + (r.vivo ? 'on' : 'off');
+  document.getElementById('pulseTxt').textContent = r.vivo ? 'VIVO ' + ago(r.ultimo_latido_hace_seg) : 'CAÍDO';
+  document.getElementById('sAct').textContent = e.cola.ejecutando;
+  document.getElementById('sCola').textContent = e.cola.pendientes;
+  document.getElementById('sMps').textContent = e.mps_pendientes;
+  const dia = Date.now() - 864e5;
+  const c = data.jobs.filter(j=>j.creado && new Date(j.creado)>dia)
+                     .reduce((s,j)=>s+Number(j.costo||0),0);
+  document.getElementById('sCosto').textContent = '$' + c.toFixed(2);
+}
+
+function render() {
+  const v = document.getElementById('view');
+  if (tab === 'flota') {
+    const js = data.jobs;
+    if (!js.length) return v.innerHTML = '<div class="empty">La fragua está fría.<br>Ningún trabajo en la cola.</div>';
+    v.innerHTML = js.map(j => {
+      const st = j.status;
+      const cls = st==='running'?'run':st==='done'?'done':st==='error'?'err':'pend';
+      const live = st==='running';
+      return `<div class="card ${live?'live':''}">
+        <div class="row">
+          <div class="t">${esc(j.titulo)}</div>
+          <span class="tag ${cls}">${live ? (esc(j.fase||'').toUpperCase()||'ACTIVO') : st.toUpperCase()}</span>
+        </div>
+        <div class="meta">
+          ${j.proyecto?`<span>${esc(j.proyecto)}</span>`:''}
+          ${j.mp?`<span>${esc(j.mp)}</span>`:''}
+          <span>${when(j.creado)}</span>
+          ${j.costo?`<span>$${Number(j.costo).toFixed(2)}</span>`:''}
+          ${j.verify?`<span style="color:${j.verify==='pass'?'var(--ok)':'var(--bad)'}">verify ${esc(j.verify)}</span>`:''}
+        </div>
+        ${j.error?`<div class="meta" style="color:var(--bad)">${esc(String(j.error).slice(0,90))}</div>`:''}
+      </div>`;
+    }).join('');
+  }
+
+  if (tab === 'tareas') {
+    const ts = data.tareas;
+    if (!ts.length) return v.innerHTML = '<div class="empty">Sin pendientes.<br>El yunque está limpio.</div>';
+    v.innerHTML = ts.map(t => `<div class="card">
+      <div class="row">
+        <div class="t">${t.hoy?'🔥 ':''}${esc(t.titulo)}</div>
+        <span class="tag ${t.prioridad==='high'?'err':t.prioridad==='medium'?'pend':''}">${esc(t.prioridad||'').toUpperCase()}</span>
+      </div>
+      <div class="meta">
+        ${t.categoria?`<span>${esc(t.categoria)}</span>`:''}
+        ${t.vence?`<span>vence ${esc(t.vence)}</span>`:''}
+      </div>
+      ${t.notas?`<div class="meta">${esc(String(t.notas).slice(0,110))}</div>`:''}
+    </div>`).join('');
+  }
+
+  if (tab === 'proyectos') {
+    v.innerHTML = data.proyectos.map(p => {
+      const [h, tt] = String(p.avance).split('/').map(Number);
+      const pct = tt ? Math.round(h/tt*100) : 0;
+      return `<div class="card">
+        <div class="row">
+          <div class="t">${esc(p.nombre)}</div>
+          <span class="tag ${p.estado==='activo'?'run':'done'}">${esc(p.estado).toUpperCase()}</span>
+        </div>
+        <div class="meta"><span>${esc(p.avance)} MPs</span><span>${pct}%</span>
+          ${p.autopilot?'<span style="color:var(--fire)">autopiloto</span>':''}</div>
+        <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+      </div>`;
+    }).join('');
+  }
+
+  if (tab === 'eventos') {
+    v.innerHTML = data.eventos.map(e => {
+      const c = e.severity==='error'?'var(--bad)':e.severity==='warn'?'var(--warn)':'var(--dim)';
+      return `<div class="card">
+        <div class="t" style="font-weight:400;font-size:13px">${esc(e.summary)}</div>
+        <div class="meta"><span style="color:${c}">${esc(e.kind)}</span><span>${when(e.at)}</span>
+          ${!e.atendido && e.severity!=='info' ? '<span style="color:var(--warn)">sin atender</span>' : ''}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); tab = b.dataset.t; render();
+});
+document.getElementById('ref').onclick = () => { document.getElementById('ref').classList.add('spin'); load().finally(()=>document.getElementById('ref').classList.remove('spin')); };
+
+load();
+setInterval(load, 15000);
+</script>
+</body>
+</html>
