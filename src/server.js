@@ -14,8 +14,6 @@ const SB_HEADERS = {
   apikey: SUPABASE_KEY,
   Authorization: `Bearer ${SUPABASE_KEY}`,
   "Content-Type": "application/json",
-  "Accept-Profile": "yunque",
-  "Content-Profile": "yunque",
 };
 
 async function rpc(fn, args = {}) {
