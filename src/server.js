@@ -4,6 +4,11 @@
 // Habla con Supabase (schema yunque) via REST — sin WebSocket.
 // ============================================================
 import express from "express";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PORT = process.env.PORT || 3000;
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -74,6 +79,7 @@ async function forjar({
   prioridad = 100,
 }) {
   return await rpc("yq_forjar", {
+    p_token: MCP_SECRET,
     p_titulo: titulo,
     p_prompt: prompt,
     p_proyecto: proyecto,
@@ -85,7 +91,7 @@ async function forjar({
 }
 
 async function cancelar({ job_id }) {
-  return await rpc("yq_cancelar", { p_job_id: job_id });
+  return await rpc("yq_cancelar", { p_token: MCP_SECRET, p_job_id: job_id });
 }
 
 async function tareas({ status = "todo" }) {
@@ -102,6 +108,7 @@ async function crearTarea({
   hoy = false,
 }) {
   return await rpc("yq_crear_tarea", {
+    p_token: MCP_SECRET,
     p_titulo: titulo,
     p_categoria: categoria,
     p_notas: notas,
@@ -112,7 +119,7 @@ async function crearTarea({
 }
 
 async function completarTarea({ id }) {
-  return await rpc("yq_completar_tarea", { p_id: id });
+  return await rpc("yq_completar_tarea", { p_token: MCP_SECRET, p_id: id });
 }
 
 async function eventos({ limite = 20, solo_alertas = false }) {
@@ -293,6 +300,26 @@ async function handleMcp(req, res) {
 }
 
 // Ruta con cabecera Authorization: Bearer <secreto>
+// --- CABINA: tablero visual ---
+const CABINA = fs.readFileSync(path.join(__dirname, "cabina.html"), "utf8");
+
+app.get("/cabina/:secret", (req, res) => {
+  if (MCP_SECRET && req.params.secret !== MCP_SECRET) return res.status(401).send("No autorizado");
+  res.type("html").send(CABINA);
+});
+
+app.post("/cabina-api/:secret", async (req, res) => {
+  if (MCP_SECRET && req.params.secret !== MCP_SECRET)
+    return res.status(401).json({ error: "No autorizado" });
+  const tool = TOOLS.find((t) => t.name === req.body?.tool);
+  if (!tool) return res.status(404).json({ error: "Herramienta desconocida" });
+  try {
+    res.json(await tool.handler(req.body.args || {}));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post("/mcp", handleMcp);
 
 // Ruta con el secreto en el path — para clientes que solo aceptan una URL
