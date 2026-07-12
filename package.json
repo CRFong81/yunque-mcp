@@ -1,0 +1,9 @@
+{
+  "name": "yunque-mcp",
+  "version": "1.0.0",
+  "description": "Servidor MCP de Yunque — control del orquestador desde cualquier chat",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": { "start": "node src/server.js" },
+  "dependencies": { "express": "^4.19.2" }
+}
