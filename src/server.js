@@ -54,6 +54,8 @@ async function proyectos() {
       estado: x.estado,
       autopilot: x.autopilot,
       avance: `${x.mps_hechos}/${x.mps_total}`,
+      jobs_activos: Number(x.jobs_activos || 0),
+      trabajando_en: x.trabajando_en || null,
       repo: x.repo,
     })),
   };
