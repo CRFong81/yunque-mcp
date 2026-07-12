@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Yunque">
 <title>YUNQUE</title>
 <style>
   :root{
@@ -130,7 +137,7 @@
 </nav>
 
 <script>
-const API = location.pathname.replace(/\/cabina.*$/, '') + '/cabina-api' + location.pathname.match(/\/cabina\/([^\/]+)/)[0].replace('/cabina','');
+const API = 'api';
 let tab = 'flota', data = {}, timer = null;
 
 async function call(tool, args={}) {
@@ -256,6 +263,33 @@ document.getElementById('ref').onclick = () => { document.getElementById('ref').
 
 load();
 setInterval(load, 15000);
+
+// --- PWA: registrar service worker ---
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js', { scope: './' }).catch(()=>{});
+}
+
+// --- PWA: boton de instalar (Android/Chrome) ---
+let deferred = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferred = e;
+  const b = document.createElement('button');
+  b.id = 'installBtn';
+  b.textContent = '⬇  INSTALAR YUNQUE';
+  b.style.cssText = 'position:fixed;left:14px;right:14px;bottom:calc(88px + env(safe-area-inset-bottom));z-index:30;background:linear-gradient(90deg,var(--fire),var(--ember));color:#0b0d12;border:0;border-radius:12px;padding:14px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.12em;cursor:pointer;box-shadow:0 8px 26px rgba(255,107,26,.35)';
+  b.onclick = async () => {
+    b.remove();
+    deferred.prompt();
+    await deferred.userChoice;
+    deferred = null;
+  };
+  document.body.appendChild(b);
+});
+window.addEventListener('appinstalled', () => {
+  const b = document.getElementById('installBtn');
+  if (b) b.remove();
+});
 </script>
 </body>
 </html>
