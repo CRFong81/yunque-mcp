@@ -250,7 +250,7 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 const auth = (req) =>
   !MCP_SECRET || (req.headers.authorization || "") === `Bearer ${MCP_SECRET}`;
 
-app.post("/mcp", async (req, res) => {
+async function handleMcp(req, res) {
   if (!auth(req)) {
     return res.status(401).json({
       jsonrpc: "2.0",
@@ -290,6 +290,22 @@ app.post("/mcp", async (req, res) => {
     console.error("[mcp]", err);
     return fail(err.message || String(err));
   }
+}
+
+// Ruta con cabecera Authorization: Bearer <secreto>
+app.post("/mcp", handleMcp);
+
+// Ruta con el secreto en el path — para clientes que solo aceptan una URL
+app.post("/mcp/:secret", (req, res) => {
+  if (MCP_SECRET && req.params.secret !== MCP_SECRET) {
+    return res.status(401).json({
+      jsonrpc: "2.0",
+      id: req.body?.id ?? null,
+      error: { code: -32001, message: "No autorizado" },
+    });
+  }
+  req.headers.authorization = `Bearer ${MCP_SECRET}`;
+  return handleMcp(req, res);
 });
 
 app.listen(PORT, () => {
