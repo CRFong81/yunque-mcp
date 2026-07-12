@@ -155,6 +155,20 @@ const when = t => {
   const d = Math.floor((Date.now()-new Date(t))/1000);
   return d<60?'ahora':d<3600?Math.floor(d/60)+'m':d<86400?Math.floor(d/3600)+'h':Math.floor(d/86400)+'d';
 };
+const stamp = t => {
+  if(!t) return '';
+  const d = new Date(t);
+  const hoy = new Date().toDateString() === d.toDateString();
+  const hora = d.toLocaleTimeString('es-PA',{hour:'2-digit',minute:'2-digit'});
+  return hoy ? `hoy ${hora}` : `${d.toLocaleDateString('es-PA',{day:'2-digit',month:'short'})} ${hora}`;
+};
+const dur = (a,b) => {
+  if(!a) return '';
+  const s = Math.floor(((b?new Date(b):new Date()) - new Date(a))/1000);
+  if (s < 60) return s+'s';
+  const m = Math.floor(s/60);
+  return m < 60 ? m+' min' : Math.floor(m/60)+'h '+(m%60)+'m';
+};
 const esc = s => String(s??'').replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
 
 async function load() {
@@ -200,9 +214,11 @@ function render() {
           <span class="tag ${cls}">${live ? (esc(j.fase||'').toUpperCase()||'ACTIVO') : st.toUpperCase()}</span>
         </div>
         <div class="meta">
-          ${j.proyecto?`<span>${esc(j.proyecto)}</span>`:''}
+          ${j.proyecto?`<span style="color:var(--ember)">${esc(j.proyecto)}</span>`:''}
           ${j.mp?`<span>${esc(j.mp)}</span>`:''}
-          <span>${when(j.creado)}</span>
+          <span>${stamp(j.creado)}</span>
+          ${live?`<span style="color:var(--fire)">⏱ ${dur(j.creado)}</span>`:''}
+          ${j.terminado?`<span>duró ${dur(j.creado, j.terminado)}</span>`:''}
           ${j.costo?`<span>$${Number(j.costo).toFixed(2)}</span>`:''}
           ${j.verify?`<span style="color:${j.verify==='pass'?'var(--ok)':'var(--bad)'}">verify ${esc(j.verify)}</span>`:''}
         </div>
@@ -231,12 +247,18 @@ function render() {
     v.innerHTML = data.proyectos.map(p => {
       const [h, tt] = String(p.avance).split('/').map(Number);
       const pct = tt ? Math.round(h/tt*100) : 0;
-      return `<div class="card">
+      const activo = p.trabajando_en;
+      return `<div class="card ${activo?'live':''}">
         <div class="row">
           <div class="t">${esc(p.nombre)}</div>
-          <span class="tag ${p.estado==='activo'?'run':'done'}">${esc(p.estado).toUpperCase()}</span>
+          ${activo
+            ? '<span class="tag run">⚒ FORJANDO</span>'
+            : `<span class="tag ${p.estado==='activo'?'pend':'done'}">${esc(p.estado).toUpperCase()}</span>`}
         </div>
+        ${activo ? `<div class="meta" style="color:var(--ember);margin-top:9px">
+            <span>⚒ ${esc(String(activo).slice(0,58))}</span></div>` : ''}
         <div class="meta"><span>${esc(p.avance)} MPs</span><span>${pct}%</span>
+          ${p.jobs_activos ? `<span style="color:var(--fire)">${p.jobs_activos} job${p.jobs_activos>1?'s':''} en curso</span>` : ''}
           ${p.autopilot?'<span style="color:var(--fire)">autopiloto</span>':''}</div>
         <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
       </div>`;
@@ -248,7 +270,7 @@ function render() {
       const c = e.severity==='error'?'var(--bad)':e.severity==='warn'?'var(--warn)':'var(--dim)';
       return `<div class="card">
         <div class="t" style="font-weight:400;font-size:13px">${esc(e.summary)}</div>
-        <div class="meta"><span style="color:${c}">${esc(e.kind)}</span><span>${when(e.at)}</span>
+        <div class="meta"><span style="color:${c}">${esc(e.kind)}</span><span>${stamp(e.at)}</span>
           ${!e.atendido && e.severity!=='info' ? '<span style="color:var(--warn)">sin atender</span>' : ''}</div>
       </div>`;
     }).join('');
