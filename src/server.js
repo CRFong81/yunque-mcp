@@ -129,6 +129,19 @@ async function eventos({ limite = 20, solo_alertas = false }) {
   return { total: r.length, eventos: r };
 }
 
+async function bitacora({ proyecto = null, tipo = null, since = null, limite = 50 }) {
+  return await rpc("yq_bitacora", {
+    p_proyecto: proyecto,
+    p_tipo: tipo,
+    p_since: since,
+    p_limite: limite,
+  });
+}
+
+async function alcance({ proyecto }) {
+  return await rpc("yq_alcance", { p_proyecto: proyecto });
+}
+
 // ---------------- registro MCP ----------------
 const TOOLS = [
   {
@@ -244,6 +257,34 @@ const TOOLS = [
       },
     },
     handler: eventos,
+  },
+  {
+    name: "bitacora",
+    description:
+      "Lee la BITACORA del director y el auditor de alcance (MP-DIRECTOR): la via de vuelta que deja lista para retomar el hilo en una sola consulta. Cada entrada trae tipo (hallazgo=lo que un job revelo y contradijo el plan, desvio=el plan se aparto del brief, pregunta=decision de producto para Cesar, cierre=veredicto del auditor de alcance), un resumen legible, el detalle y datos estructurados. Mas recientes primero.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        proyecto: { type: "string", description: "Nombre del proyecto (ej. 'Yunque', 'ORYM') o su UUID. Omitir para ver todos." },
+        tipo: { type: "string", description: "hallazgo | desvio | pregunta | cierre" },
+        since: { type: "string", description: "ISO 8601 — solo entradas posteriores (consumo incremental)." },
+        limite: { type: "number", description: "Maximo de entradas (default 50)." },
+      },
+    },
+    handler: bitacora,
+  },
+  {
+    name: "alcance",
+    description:
+      "Muestra el ALCANCE de un proyecto (MP-DIRECTOR): el BRIEF ORIGINAL de Cesar y sus criterios de aceptacion (lo PEDIDO), junto al ultimo veredicto del AUDITOR DE ALCANCE criterio por criterio (CUMPLE / NO_CUMPLE / NO_VERIFICABLE con su evidencia, lo ENTREGADO). Un proyecto solo esta de verdad terminado si el auditor confirma todos los criterios.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        proyecto: { type: "string", description: "Proyecto a auditar: su nombre (ej. 'Yunque', 'ORYM') o su UUID." },
+      },
+      required: ["proyecto"],
+    },
+    handler: alcance,
   },
 ];
 
