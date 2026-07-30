@@ -32,6 +32,41 @@ async function rpc(fn, args = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
+// ---------------- briefing de arranque ----------------
+// Lo PRIMERO que ve un coworker de claude.ai al conectarse. Debe bastar para operar
+// Yunque bien sin preguntar. El detalle completo lo devuelve la tool `guia`.
+const INSTRUCTIONS =
+  "YUNQUE — fábrica de software autónoma (una 'fragua'). Convierte tareas en JOBS ejecutados " +
+  "por Claude Code headless (`claude -p`) sobre repos reales, en la PC de Cesar. Claude corre " +
+  "por la SUSCRIPCIÓN del CLI, NUNCA por API key. Una sola fuente de verdad: Postgres/Supabase, " +
+  "schema `yunque`; los procesos se coordinan escribiendo/leyendo la base. Componentes: worker " +
+  "(ejecuta jobs), auto-piloto (planea y forja solo), este MCP server (la cola como " +
+  "herramientas), desktop Electron y una PWA móvil.\n\n" +
+  "EL CICLO: forjar (encolar un job) → el worker corre Claude Code en el repo → el TEMPLE (un " +
+  "`claude -p` INDEPENDIENTE inspecciona el repo y corre el green gate) verifica antes de cerrar " +
+  "'done' → se emite EVIDENCIA estructurada al cerrar. Si el temple no puede DEMOSTRAR que quedó " +
+  "hecho, el job cae a FISURA en vez de cerrarse en falso (fail-closed). Dos modos: SUPERVISADO " +
+  "(las partidas esperan aprobación) y AUTÓNOMO (con el auto-piloto encendido, el cerebro " +
+  "construye el proyecto solo hasta terminar).\n\n" +
+  "HERRAMIENTAS (orden recomendado: primero llama `guia`, luego ponte al día con estado → " +
+  "eventos → proyectos, y recién entonces actúa). Memoria de LECCIONES (yunque acumula lo " +
+  "aprendido con cada cierre de job, se captura SOLA, sin gastar un LLM): list_lecciones (léelas " +
+  "ANTES de forjar para no repetir errores y reusar lo que funcionó), add_leccion (deja una a " +
+  "mano). Cola/flota/planes: estado, eventos, bitacora, alcance (ponerse al día); jobs, forjar, " +
+  "cancelar_job; mps, proyectos; tareas, crear_tarea, completar_tarea.\n\n" +
+  "PROCEDIMIENTO DE CODIFICACIÓN — FASE 0 (spec-driven): TODO job de código pasa por constitution " +
+  "→ spec → plan → tasks → [GATE de diseño] → implement, con los artefactos en " +
+  "`<repo>/.specify/<slug>/`. Doctrina: 'mide diez veces, corta una sola vez' — un solo viaje de " +
+  "codificación completo, commits atómicos, un PR. El `prompt` de forjar debe ser COMPLETO y " +
+  "autocontenido (el worker no ve esta conversación).\n\n" +
+  "REGLAS DURAS: suscripción, NUNCA API key; nunca comitear `.env`; licencias MIT/Apache-2.0; la " +
+  "verdad vive en la base; no borrar triggers ni tareas programadas; green gate (no terminas " +
+  "hasta build+tests+CI verdes; si algo queda rojo, para y repórtalo); fail-closed. " +
+  "ANTI-VERDE-FALSO: nunca confíes en un 'verify: pass' sin EVIDENCIA DURA — junit de una suite " +
+  "que corrió, rutas de archivos que existen, hashes de commit reales, salida de build sin " +
+  "errores. Un reporte que dice 'todo verde' no es evidencia.\n\n" +
+  "Para el detalle completo llama a la herramienta `guia`.";
+
 // ---------------- herramientas ----------------
 
 async function estado() {
@@ -140,6 +175,63 @@ async function bitacora({ proyecto = null, tipo = null, since = null, limite = 5
 
 async function alcance({ proyecto }) {
   return await rpc("yq_alcance", { p_proyecto: proyecto });
+}
+
+// --- MEMORIA DE LECCIONES (yunque.lecciones, compartida con el MCP local) ---
+async function listLecciones({ project_id = null, categoria = null, limite = 20 }) {
+  const r = await rpc("yq_lecciones", {
+    p_project_id: project_id,
+    p_categoria: categoria,
+    p_limite: limite,
+  });
+  const lecciones = Array.isArray(r) ? r : [];
+  return { total: lecciones.length, lecciones };
+}
+
+async function addLeccion({ titulo, leccion, categoria = "proceso", project_id = null, causa = null }) {
+  return await rpc("yq_add_leccion", {
+    p_token: MCP_SECRET,
+    p_titulo: titulo,
+    p_leccion: leccion,
+    p_categoria: categoria,
+    p_project_id: project_id,
+    p_causa: causa,
+  });
+}
+
+// --- GUIA: briefing completo, leido de disco en runtime (src/GUIA.md) ---
+const GUIA_FALLBACK =
+  "GUÍA DE YUNQUE (respaldo — no se encontró src/GUIA.md en disco).\n\n" +
+  "Yunque es una fábrica de software autónoma: corre Claude Code headless (`claude -p`, " +
+  "por la SUSCRIPCIÓN de Cesar, NUNCA API key) sobre repos reales; el estado vive en " +
+  "Supabase (schema `yunque`). Ciclo: forjar (encolar job) → el worker corre Claude en el " +
+  "repo → el TEMPLE (inspector independiente) verifica → se emite EVIDENCIA al cerrar. " +
+  "Modos Supervisado y Autónomo. Todo job de código pasa por FASE 0 " +
+  "(constitution→spec→plan→tasks→gate→implement). Reglas duras: suscripción no API key; " +
+  "nunca comitear `.env`; licencias MIT/Apache-2.0; no borrar triggers/tareas; green gate " +
+  "+ fail-closed; ANTI-VERDE-FALSO: nunca confíes en un 'verify: pass' sin evidencia dura.";
+
+function readGuia() {
+  const candidates = [
+    path.join(__dirname, "GUIA.md"),
+    path.resolve(__dirname, "..", "GUIA.md"),
+    path.resolve(process.cwd(), "src", "GUIA.md"),
+    path.resolve(process.cwd(), "GUIA.md"),
+  ];
+  for (const c of candidates) {
+    try {
+      const t = fs.readFileSync(c, "utf8");
+      if (t.trim().length > 0) return t;
+    } catch {
+      /* no existe / sin permiso: probar el siguiente candidato */
+    }
+  }
+  return GUIA_FALLBACK;
+}
+
+// Devuelve el texto crudo (el transporte lo emite tal cual, sin envolver en JSON).
+async function guia() {
+  return readGuia();
 }
 
 // ---------------- registro MCP ----------------
@@ -286,6 +378,51 @@ const TOOLS = [
     },
     handler: alcance,
   },
+  {
+    name: "guia",
+    description:
+      "Briefing completo de Yunque para cualquier coworker: qué es, cómo funciona el ciclo " +
+      "(forjar→worker→temple→evidencia), las herramientas y su orden, el procedimiento de " +
+      "codificación Fase 0, las reglas duras y el anti-verde-falso, y la memoria de lecciones. " +
+      "Llámala apenas te conectes, antes de actuar.",
+    inputSchema: { type: "object", properties: {} },
+    handler: guia,
+  },
+  {
+    name: "list_lecciones",
+    description:
+      "Lee la MEMORIA de LECCIONES de Yunque (yunque.lecciones): el destilado accionable de cada " +
+      "cierre de job ('funcionó: …' / 'se rompió: … → recordar: …'), más nuevas primero. Con " +
+      "project_id devuelve las de ESE proyecto MÁS las globales. Léela ANTES de forjar para no " +
+      "repetir errores y reusar lo que funcionó.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_id: { type: "string", description: "UUID del proyecto: sus lecciones + las globales. Omitir = todas las recientes." },
+        categoria: { type: "string", description: "exito | fisura | proceso" },
+        limite: { type: "number", description: "Máximo de lecciones (default 20)." },
+      },
+    },
+    handler: listLecciones,
+  },
+  {
+    name: "add_leccion",
+    description:
+      "Deja una LECCIÓN aprendida a mano en la memoria de la fragua (yunque.lecciones), para que " +
+      "cualquier coworker o Cesar la lea al instante. Sin project_id, la lección es GLOBAL.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        titulo: { type: "string", description: "Título breve de la lección." },
+        leccion: { type: "string", description: "El aprendizaje accionable ('funcionó: …' / 'se rompió: … → recordar: …')." },
+        categoria: { type: "string", description: "exito (algo que funcionó) | fisura (algo que se rompió) | proceso (cómo trabajar mejor). Default: proceso." },
+        project_id: { type: "string", description: "UUID del proyecto al que pertenece. Omitir = GLOBAL." },
+        causa: { type: "string", description: "Causa real (útil sobre todo en las de categoría 'fisura')." },
+      },
+      required: ["titulo", "leccion"],
+    },
+    handler: addLeccion,
+  },
 ];
 
 // ---------------- transporte ----------------
@@ -320,6 +457,7 @@ async function handleMcp(req, res) {
         protocolVersion: "2024-11-05",
         capabilities: { tools: {} },
         serverInfo: { name: "yunque-mcp", version: "1.0.0" },
+        instructions: INSTRUCTIONS,
       });
     if (method === "notifications/initialized") return res.status(204).end();
     if (method === "tools/list")
@@ -334,7 +472,9 @@ async function handleMcp(req, res) {
       const tool = TOOLS.find((t) => t.name === params.name);
       if (!tool) return fail(`Herramienta desconocida: ${params.name}`, -32602);
       const result = await tool.handler(params.arguments || {});
-      return ok({ content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+      // Un handler que devuelve string (p.ej. `guia`) se emite tal cual; el resto como JSON.
+      const text = typeof result === "string" ? result : JSON.stringify(result, null, 2);
+      return ok({ content: [{ type: "text", text }] });
     }
     return fail(`Metodo no soportado: ${method}`, -32601);
   } catch (err) {

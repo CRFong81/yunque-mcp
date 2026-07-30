@@ -1,0 +1,8 @@
+# dependencias (Railway las instala en el build; no van al repo)
+node_modules/
+package-lock.json
+
+# secretos — NUNCA se comitean
+.env
+.env.*
+!.env.example
