@@ -228,6 +228,7 @@ NO están al día entre sí:
 | Cómo corre | En la PC de Cesar (proceso local, puerto 47700) | En Railway (nube, se redespliega solo) |
 | Tiene el briefing (`instructions` + tool `guia`) | **Sí** — esta misma guía | **No** (todavía) |
 | Tiene lecciones aprendidas (`list_lecciones`/`add_leccion`) | **Sí** | **No** (todavía) |
+| Tiene el LAZO (`lanzar_lazo` · `lazo_estado` · `lazo_alto`) | No (todavía) | **Sí** (LAZO-4): soltar un plan acordado en el chat, ver cómo va, y frenarlo cuando Cesar dice «ALTO» |
 
 ### Dónde está el clon del MCP de Railway en esta PC
 

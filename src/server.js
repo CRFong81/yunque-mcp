@@ -7,6 +7,7 @@ import express from "express";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { lazoTools } from "./lazo.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -54,6 +55,10 @@ const INSTRUCTIONS =
   "ANTES de forjar para no repetir errores y reusar lo que funcionó), add_leccion (deja una a " +
   "mano). Cola/flota/planes: estado, eventos, bitacora, alcance (ponerse al día); jobs, forjar, " +
   "cancelar_job; mps, proyectos; tareas, crear_tarea, completar_tarea.\n\n" +
+  "LAZO (soltar un plan y dejarlo correr con frenos): cuando Cesar acuerda un plan en el chat, " +
+  "lanzar_lazo lo carga UNA vez (partidas + lazo + auto-piloto ON); lazo_estado dice cómo va; y " +
+  "si Cesar dice 'ALTO', llama lazo_alto en ese mismo momento. Marca irreversible=true todo paso " +
+  "que despliegue, publique o no se pueda deshacer (va siempre a la bandeja de Cesar).\n\n" +
   "PROCEDIMIENTO DE CODIFICACIÓN — FASE 0 (spec-driven): TODO job de código pasa por constitution " +
   "→ spec → plan → tasks → [GATE de diseño] → implement, con los artefactos en " +
   "`<repo>/.specify/<slug>/`. Doctrina: 'mide diez veces, corta una sola vez' — un solo viaje de " +
@@ -423,6 +428,7 @@ const TOOLS = [
     },
     handler: addLeccion,
   },
+  ...lazoTools(rpc, MCP_SECRET),
 ];
 
 // ---------------- transporte ----------------

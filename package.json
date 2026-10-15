@@ -4,6 +4,6 @@
   "description": "Servidor MCP de Yunque — control del orquestador desde cualquier chat",
   "type": "module",
   "main": "src/server.js",
-  "scripts": { "start": "node src/server.js" },
+  "scripts": { "start": "node src/server.js", "test": "node --test test/*.test.js" },
   "dependencies": { "express": "^4.19.2" }
 }
