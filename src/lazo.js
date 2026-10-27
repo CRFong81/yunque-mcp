@@ -98,6 +98,7 @@ export function lazoTools(rpc, secret) {
     },
     {
       name: "lazo_estado",
+      lectura: true,
       description:
         "Cómo va el LAZO de un proyecto: estado (corriendo | pausado | tope | alto | terminado), forjas " +
         "usadas vs tope, horas, avance de partidas (hechas, en bandeja, irreversibles pendientes) y el " +

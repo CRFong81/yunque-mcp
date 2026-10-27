@@ -6,6 +6,8 @@
 import express from "express";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { fileURLToPath } from "node:url";
 import { lazoTools } from "./lazo.js";
 
@@ -16,6 +18,33 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const MCP_SECRET = process.env.MCP_SECRET || "";
 
+// MCP-RO: llave de SOLO LECTURA (la cabina en el celular). Distinta de MCP_SECRET (la llave de
+// Claude). Si Railway no define MCP_RO_SECRET, se deriva de MCP_SECRET con HMAC: es otra cadena,
+// y conocerla no revela MCP_SECRET. Con ella el server solo lista y ejecuta tools de lectura.
+const MCP_RO_SECRET =
+  process.env.MCP_RO_SECRET ||
+  (MCP_SECRET ? crypto.createHmac("sha256", MCP_SECRET).update("yunque-mcp-ro-v1").digest("hex") : "");
+if (MCP_RO_SECRET && MCP_RO_SECRET === MCP_SECRET)
+  console.error("[mcp-ro] MCP_RO_SECRET es igual a MCP_SECRET: la llave de lectura queda DESACTIVADA");
+
+const igual = (a, b) => {
+  const x = Buffer.from(String(a));
+  const y = Buffer.from(String(b));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+};
+
+// "total" | "lectura" | null (no autorizado)
+function nivel(token) {
+  if (!MCP_SECRET) return "total";
+  if (igual(token, MCP_SECRET)) return "total";
+  if (MCP_RO_SECRET && MCP_RO_SECRET !== MCP_SECRET && igual(token, MCP_RO_SECRET)) return "lectura";
+  return null;
+}
+
+// Contexto de la petición en curso: con la llave de lectura, rpc() se niega a mandar p_token
+// (segunda barrera por si una tool de escritura quedara mal marcada como lectura).
+const peticion = new AsyncLocalStorage();
+
 const SB_HEADERS = {
   apikey: SUPABASE_KEY,
   Authorization: `Bearer ${SUPABASE_KEY}`,
@@ -23,6 +52,8 @@ const SB_HEADERS = {
 };
 
 async function rpc(fn, args = {}) {
+  if (peticion.getStore()?.nivel === "lectura" && "p_token" in args)
+    throw new Error(`Solo lectura: ${fn} exige la llave completa`);
   const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
     method: "POST",
     headers: SB_HEADERS,
@@ -243,6 +274,7 @@ async function guia() {
 const TOOLS = [
   {
     name: "estado",
+    lectura: true,
     description:
       "Estado de Yunque de un vistazo: si el runner esta vivo, cuantos jobs se estan ejecutando, la cola, las alertas abiertas y los MPs pendientes. Usar cuando Cesar pregunta '¿como esta Yunque?' o '¿esta trabajando?'.",
     inputSchema: { type: "object", properties: {} },
@@ -250,12 +282,14 @@ const TOOLS = [
   },
   {
     name: "proyectos",
+    lectura: true,
     description: "Lista los proyectos de Yunque (QUANTIX, ORYM, CafeCAD, Prevolo, Yunque) con su avance de MPs y si el autopiloto esta encendido.",
     inputSchema: { type: "object", properties: {} },
     handler: proyectos,
   },
   {
     name: "mps",
+    lectura: true,
     description:
       "Lista las partidas (MPs) del plan de un proyecto: cuales estan cerradas, cuales abiertas, y el estado de su job. Usar para saber que falta de un proyecto.",
     inputSchema: {
@@ -269,6 +303,7 @@ const TOOLS = [
   },
   {
     name: "jobs",
+    lectura: true,
     description: "Lista los jobs recientes de Yunque con su estado, costo y veredicto de verificacion.",
     inputSchema: {
       type: "object",
@@ -309,6 +344,7 @@ const TOOLS = [
   },
   {
     name: "tareas",
+    lectura: true,
     description: "Lista las tareas pendientes de Cesar (su lista de pendientes personal en Yunque).",
     inputSchema: {
       type: "object",
@@ -345,6 +381,7 @@ const TOOLS = [
   },
   {
     name: "eventos",
+    lectura: true,
     description: "Bitacora de Yunque: que ha pasado (jobs forjados, fisuras, alertas del runner). Usar solo_alertas=true para ver lo que necesita atencion.",
     inputSchema: {
       type: "object",
@@ -357,6 +394,7 @@ const TOOLS = [
   },
   {
     name: "bitacora",
+    lectura: true,
     description:
       "Lee la BITACORA del director y el auditor de alcance (MP-DIRECTOR): la via de vuelta que deja lista para retomar el hilo en una sola consulta. Cada entrada trae tipo (hallazgo=lo que un job revelo y contradijo el plan, desvio=el plan se aparto del brief, pregunta=decision de producto para Cesar, cierre=veredicto del auditor de alcance), un resumen legible, el detalle y datos estructurados. Mas recientes primero.",
     inputSchema: {
@@ -372,6 +410,7 @@ const TOOLS = [
   },
   {
     name: "alcance",
+    lectura: true,
     description:
       "Muestra el ALCANCE de un proyecto (MP-DIRECTOR): el BRIEF ORIGINAL de Cesar y sus criterios de aceptacion (lo PEDIDO), junto al ultimo veredicto del AUDITOR DE ALCANCE criterio por criterio (CUMPLE / NO_CUMPLE / NO_VERIFICABLE con su evidencia, lo ENTREGADO). Un proyecto solo esta de verdad terminado si el auditor confirma todos los criterios.",
     inputSchema: {
@@ -385,6 +424,7 @@ const TOOLS = [
   },
   {
     name: "guia",
+    lectura: true,
     description:
       "Briefing completo de Yunque para cualquier coworker: qué es, cómo funciona el ciclo " +
       "(forjar→worker→temple→evidencia), las herramientas y su orden, el procedimiento de " +
@@ -395,6 +435,7 @@ const TOOLS = [
   },
   {
     name: "list_lecciones",
+    lectura: true,
     description:
       "Lee la MEMORIA de LECCIONES de Yunque (yunque.lecciones): el destilado accionable de cada " +
       "cierre de job ('funcionó: …' / 'se rompió: … → recordar: …'), más nuevas primero. Con " +
@@ -441,11 +482,19 @@ app.get("/", (_req, res) =>
 );
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-const auth = (req) =>
-  !MCP_SECRET || (req.headers.authorization || "") === `Bearer ${MCP_SECRET}`;
+const bearer = (req) => (req.headers.authorization || "").replace(/^Bearer /, "");
 
-async function handleMcp(req, res) {
-  if (!auth(req)) {
+// Tools visibles para un nivel: la llave de lectura solo ve las marcadas `lectura: true`.
+const toolsDe = (niv) => (niv === "lectura" ? TOOLS.filter((t) => t.lectura === true) : TOOLS);
+
+const INSTRUCTIONS_RO =
+  INSTRUCTIONS +
+  "\n\nESTA CONEXIÓN ES DE SOLO LECTURA (llave MCP-RO): puedes consultar estado, proyectos, " +
+  "jobs, eventos, bitácora, alcance, lecciones y lazo_estado; forjar, cancelar, crear o cerrar " +
+  "tareas, lecciones y lazos se rechazan.";
+
+async function handleMcp(req, res, niv = nivel(bearer(req))) {
+  if (!niv) {
     return res.status(401).json({
       jsonrpc: "2.0",
       id: req.body?.id ?? null,
@@ -463,12 +512,12 @@ async function handleMcp(req, res) {
         protocolVersion: "2024-11-05",
         capabilities: { tools: {} },
         serverInfo: { name: "yunque-mcp", version: "1.0.0" },
-        instructions: INSTRUCTIONS,
+        instructions: niv === "lectura" ? INSTRUCTIONS_RO : INSTRUCTIONS,
       });
     if (method === "notifications/initialized") return res.status(204).end();
     if (method === "tools/list")
       return ok({
-        tools: TOOLS.map(({ name, description, inputSchema }) => ({
+        tools: toolsDe(niv).map(({ name, description, inputSchema }) => ({
           name,
           description,
           inputSchema,
@@ -477,7 +526,13 @@ async function handleMcp(req, res) {
     if (method === "tools/call") {
       const tool = TOOLS.find((t) => t.name === params.name);
       if (!tool) return fail(`Herramienta desconocida: ${params.name}`, -32602);
-      const result = await tool.handler(params.arguments || {});
+      if (niv === "lectura" && tool.lectura !== true)
+        return res.status(403).json({
+          jsonrpc: "2.0",
+          id,
+          error: { code: -32003, message: `Solo lectura: la llave de lectura no puede usar ${tool.name}` },
+        });
+      const result = await peticion.run({ nivel: niv }, () => tool.handler(params.arguments || {}));
       // Un handler que devuelve string (p.ej. `guia`) se emite tal cual; el resto como JSON.
       const text = typeof result === "string" ? result : JSON.stringify(result, null, 2);
       return ok({ content: [{ type: "text", text }] });
@@ -493,7 +548,8 @@ async function handleMcp(req, res) {
 // --- CABINA: PWA instalable ---
 const CABINA = fs.readFileSync(path.join(__dirname, "cabina.html"), "utf8");
 
-const okSecret = (req) => !MCP_SECRET || req.params.secret === MCP_SECRET;
+// La cabina acepta la llave completa o la de lectura (ver la flota desde el celular).
+const okSecret = (req) => nivel(req.params.secret) !== null;
 
 // sin barra final -> redirige (necesario para que el scope del SW cubra la app)
 app.get("/cabina/:secret", (req, res) => {
@@ -569,10 +625,13 @@ app.get("/cabina/:secret/icons/:file", (req, res) => {
 // API de la cabina
 const cabinaApi = async (req, res) => {
   if (!okSecret(req)) return res.status(401).json({ error: "No autorizado" });
+  const niv = nivel(req.params.secret);
   const tool = TOOLS.find((t) => t.name === req.body?.tool);
   if (!tool) return res.status(404).json({ error: "Herramienta desconocida" });
+  if (niv === "lectura" && tool.lectura !== true)
+    return res.status(403).json({ error: `Solo lectura: la llave de lectura no puede usar ${tool.name}` });
   try {
-    res.json(await tool.handler(req.body.args || {}));
+    res.json(await peticion.run({ nivel: niv }, () => tool.handler(req.body.args || {})));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -580,20 +639,10 @@ const cabinaApi = async (req, res) => {
 app.post("/cabina/:secret/api", cabinaApi);
 app.post("/cabina-api/:secret", cabinaApi); // compatibilidad
 
-app.post("/mcp", handleMcp);
+app.post("/mcp", (req, res) => handleMcp(req, res));
 
 // Ruta con el secreto en el path — para clientes que solo aceptan una URL
-app.post("/mcp/:secret", (req, res) => {
-  if (MCP_SECRET && req.params.secret !== MCP_SECRET) {
-    return res.status(401).json({
-      jsonrpc: "2.0",
-      id: req.body?.id ?? null,
-      error: { code: -32001, message: "No autorizado" },
-    });
-  }
-  req.headers.authorization = `Bearer ${MCP_SECRET}`;
-  return handleMcp(req, res);
-});
+app.post("/mcp/:secret", (req, res) => handleMcp(req, res, nivel(req.params.secret)));
 
 app.listen(PORT, () => {
   console.log(`YUNQUE MCP escuchando en :${PORT}`);
