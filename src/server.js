@@ -12,6 +12,14 @@ import { fileURLToPath } from "node:url";
 import { lazoTools } from "./lazo.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Y7-VERSION: versión del paquete (esquema 7.x), para /health.
+const PKG_VERSION = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version || null;
+  } catch {
+    return null;
+  }
+})();
 
 const PORT = process.env.PORT || 3000;
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -480,7 +488,10 @@ app.use(express.json({ limit: "5mb" }));
 app.get("/", (_req, res) =>
   res.json({ name: "yunque-mcp", status: "ok", tools: TOOLS.map((t) => t.name) })
 );
-app.get("/health", (_req, res) => res.json({ ok: true }));
+// Y7-VERSION: /health público y sin llave dice qué commit corre (Railway lo inyecta en el build). null = sin dato.
+app.get("/health", (_req, res) =>
+  res.json({ ok: true, commit: process.env.RAILWAY_GIT_COMMIT_SHA || null, version: PKG_VERSION })
+);
 
 const bearer = (req) => (req.headers.authorization || "").replace(/^Bearer /, "");
 
