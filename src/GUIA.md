@@ -72,7 +72,11 @@ independiente verifica) → se emite EVIDENCIA estructurada al cerrar → done |
 **Modos de operación:**
 - **Supervisado.** Las partidas caen en una **bandeja de aprobación**
   (`awaiting_approval`) y esperan tu visto bueno antes de forjarse. Se revisan con
-  `list_approvals` y se sueltan con `approve_plan_item` / `reject_plan_item`.
+  `list_approvals` y se sueltan con `approve_plan_item` / `no_ejecutar` (MCP local;
+  `no_ejecutar` archiva la partida; el piloto sigue trabajando, sin pausarse ni bajar
+  la confianza). **Este MCP de Railway no tiene tools de aprobar ni de no ejecutar:**
+  para aprobar, no ejecutar una partida o decidir una puerta, usa la app (Bandeja) o el
+  MCP local. Una puerta (`-PUERTA-N`) se **DECIDE** (aprobar o no ejecutar), no se forja.
 - **Autónomo.** Con el auto-piloto encendido (`set_project_autopilot on=true`), el
   cerebro construye el proyecto SOLO hasta terminar: genera el plan si falta, forja las
   partidas en orden, re-forja las fisuras (hasta un tope) y marca el proyecto completado.
@@ -96,7 +100,9 @@ El MCP registra las herramientas en cinco grupos (una función de registro por g
 - *Proyectos y plan vivo:* `create_project` · `list_projects` · `add_plan_items` ·
   `get_project_plan` · `set_plan_item_model` · `forge_plan_item` · `set_plan_item_done`.
 - *Auto-piloto y bandeja:* `set_project_autopilot` · `list_approvals` ·
-  `approve_plan_item` · `reject_plan_item` · `set_project_trust` (DEPRECADO, sin efecto).
+  `approve_plan_item` · `no_ejecutar` (archiva la partida; el piloto sigue trabajando) ·
+  `set_project_trust` (DEPRECADO, sin efecto). Solo en el MCP local; en Railway, usa la
+  app (Bandeja). Las puertas (`-PUERTA-N`) se deciden, no se forjan.
 - *Expediente del proyecto:* `add_project_entry` · `list_project_entries` ·
   `set_project_entry_pinned` · `delete_project_entry`.
 - *Entregables:* `generate_project_report` · `list_project_documents` ·
