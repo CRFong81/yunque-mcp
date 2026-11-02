@@ -74,9 +74,11 @@ independiente verifica) → se emite EVIDENCIA estructurada al cerrar → done |
   (`awaiting_approval`) y esperan tu visto bueno antes de forjarse. Se revisan con
   `list_approvals` y se sueltan con `approve_plan_item` / `no_ejecutar` (MCP local;
   `no_ejecutar` archiva la partida; el piloto sigue trabajando, sin pausarse ni bajar
-  la confianza). **Este MCP de Railway no tiene tools de aprobar ni de no ejecutar:**
-  para aprobar, no ejecutar una partida o decidir una puerta, usa la app (Bandeja) o el
-  MCP local. Una puerta (`-PUERTA-N`) se **DECIDE** (aprobar o no ejecutar), no se forja.
+  la confianza). **Este MCP de Railway DECIDE TARJETAS con `decidir_tarjeta`** (canal
+  `claude-chat`; el efecto sobre la bandeja lo aplica la PC; hoy responde «apagado» mientras
+  `tarjetas_remotas` siga en false), **pero sigue SIN `no_ejecutar` ni approve directo de
+  partidas:** para eso usa la app (Bandeja) o el MCP local. Una puerta (`-PUERTA-N`) se
+  **DECIDE** (aprobar o no ejecutar), no se forja.
 - **Autónomo.** Con el auto-piloto encendido (`set_project_autopilot on=true`), el
   cerebro construye el proyecto SOLO hasta terminar: genera el plan si falta, forja las
   partidas en orden, re-forja las fisuras (hasta un tope) y marca el proyecto completado.
@@ -102,7 +104,8 @@ El MCP registra las herramientas en cinco grupos (una función de registro por g
 - *Auto-piloto y bandeja:* `set_project_autopilot` · `list_approvals` ·
   `approve_plan_item` · `no_ejecutar` (archiva la partida; el piloto sigue trabajando) ·
   `set_project_trust` (DEPRECADO, sin efecto). Solo en el MCP local; en Railway, usa la
-  app (Bandeja). Las puertas (`-PUERTA-N`) se deciden, no se forjan.
+  app (Bandeja) o decide la TARJETA de la partida con `decidir_tarjeta` (apagado por defecto).
+  Las puertas (`-PUERTA-N`) se deciden, no se forjan.
 - *Expediente del proyecto:* `add_project_entry` · `list_project_entries` ·
   `set_project_entry_pinned` · `delete_project_entry`.
 - *Entregables:* `generate_project_report` · `list_project_documents` ·
@@ -235,6 +238,20 @@ NO están al día entre sí:
 | Tiene el briefing (`instructions` + tool `guia`) | **Sí** — esta misma guía | **No** (todavía) |
 | Tiene lecciones aprendidas (`list_lecciones`/`add_leccion`) | **Sí** | **No** (todavía) |
 | Tiene el LAZO (`lanzar_lazo` · `lazo_estado` · `lazo_alto`) | No (todavía) | **Sí** (LAZO-4): soltar un plan acordado en el chat, ver cómo va, y frenarlo cuando Cesar dice «ALTO» |
+| Tiene las TARJETAS (`tarjetas` · `rendimiento` · `planta` · `alertas_cabina` · `decidir_tarjeta` · `comentar_tarjeta`) | Sí (Y7-TARJETAS) | **Sí** (Y7-MCP-RAILWAY-TARJETAS): lee y decide tarjetas por el canal `claude-chat`; **apagado por defecto** |
+
+### Tarjetas, Rendimiento y Planta (Railway)
+
+- *Lectura:* `tarjetas` (filtro Decisiones / Atención / Visto, con la evidencia de cada una) ·
+  `rendimiento` · `planta` · `alertas_cabina`.
+- *Escritura:* `decidir_tarjeta` (id, decision si|no|tal_vez|visto, razon, confirmado) y
+  `comentar_tarjeta`. El canal es fijo `claude-chat` (no es un argumento).
+- **Las reglas de los 3 canales:** (1) Claude NUNCA decide por Cesar: solo con una respuesta
+  explícita suya en esta conversación. (2) Repítele la decisión antes de guardarla. (3) Gana la
+  primera respuesta: si otro canal ya respondió verás «ya decidida por …». (4) La puerta 8
+  (irreversible) pide doble confirmación: segunda llamada con `confirmado=true`. (5) «No» exige
+  razón. (6) Mientras `settings.tarjetas_remotas` esté apagada, decidir devuelve «canal
+  claude-chat remoto apagado» y no cambia nada. El efecto sobre la bandeja lo aplica la PC.
 
 ### Dónde está el clon del MCP de Railway en esta PC
 

@@ -21,7 +21,7 @@ const RO_DERIVADA = crypto.createHmac("sha256", SECRET).update("yunque-mcp-ro-v1
 // defecto (sin `lectura: true` es escritura): si alguien la marca, esta prueba lo obliga a decidir.
 const LECTURA = [
   "estado", "proyectos", "mps", "jobs", "tareas", "eventos", "bitacora", "alcance",
-  "guia", "list_lecciones", "lazo_estado",
+  "guia", "list_lecciones", "lazo_estado", "tarjetas", "rendimiento", "planta", "alertas_cabina",
 ];
 const ESCRITURA = {
   forjar: { titulo: "t", prompt: "p", proyecto: "PRUEBA-LOOP" },
@@ -31,6 +31,8 @@ const ESCRITURA = {
   add_leccion: { titulo: "t", leccion: "l" },
   lanzar_lazo: { project: "PRUEBA-LOOP", objetivo: "o", items: [{ title: "a" }] },
   lazo_alto: { project: "PRUEBA-LOOP" },
+  decidir_tarjeta: { id: "00000000-0000-0000-0000-000000000000", decision: "si" },
+  comentar_tarjeta: { id: "00000000-0000-0000-0000-000000000000", texto: "t" },
 };
 
 let stub, stubCalls;

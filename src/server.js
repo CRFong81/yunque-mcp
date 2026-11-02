@@ -10,6 +10,7 @@ import crypto from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { fileURLToPath } from "node:url";
 import { lazoTools } from "./lazo.js";
+import { tarjetasTools } from "./tarjetas.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Y7-VERSION: versión del paquete (esquema 7.x), para /health.
@@ -98,6 +99,13 @@ const INSTRUCTIONS =
   "lanzar_lazo lo carga UNA vez (partidas + lazo + auto-piloto ON); lazo_estado dice cómo va; y " +
   "si Cesar dice 'ALTO', llama lazo_alto en ese mismo momento. Marca irreversible=true todo paso " +
   "que despliegue, publique o no se pueda deshacer (va siempre a la bandeja de Cesar).\n\n" +
+  "TARJETAS (las decisiones de Cesar; tres canales, una sola verdad): tarjetas las lista; rendimiento, " +
+  "planta y alertas_cabina muestran cómo va la fábrica; decidir_tarjeta y comentar_tarjeta responden por " +
+  "el canal claude-chat. REGLAS: Claude NUNCA decide por Cesar: solo con una respuesta explícita suya en " +
+  "esta conversación; repítele la decisión antes de guardarla; gana la primera respuesta (si otro canal ya " +
+  "respondió verás «ya decidida por …»); la puerta 8 y los pasos irreversibles piden doble confirmación " +
+  "(confirmado=true en una segunda llamada); «no» exige razón. Mientras settings.tarjetas_remotas esté " +
+  "apagada, decidir responde «canal claude-chat remoto apagado» y no cambia nada.\n\n" +
   "PROCEDIMIENTO DE CODIFICACIÓN — FASE 0 (spec-driven): TODO job de código pasa por constitution " +
   "→ spec → plan → tasks → [GATE de diseño] → implement, con los artefactos en " +
   "`<repo>/.specify/<slug>/`. Doctrina: 'mide diez veces, corta una sola vez' — un solo viaje de " +
@@ -478,6 +486,7 @@ const TOOLS = [
     handler: addLeccion,
   },
   ...lazoTools(rpc, MCP_SECRET),
+  ...tarjetasTools(rpc, MCP_SECRET),
 ];
 
 // ---------------- transporte ----------------
@@ -501,8 +510,9 @@ const toolsDe = (niv) => (niv === "lectura" ? TOOLS.filter((t) => t.lectura === 
 const INSTRUCTIONS_RO =
   INSTRUCTIONS +
   "\n\nESTA CONEXIÓN ES DE SOLO LECTURA (llave MCP-RO): puedes consultar estado, proyectos, " +
-  "jobs, eventos, bitácora, alcance, lecciones y lazo_estado; forjar, cancelar, crear o cerrar " +
-  "tareas, lecciones y lazos se rechazan.";
+  "jobs, eventos, bitácora, alcance, lecciones, lazo_estado, tarjetas, rendimiento, planta y " +
+  "alertas_cabina; forjar, cancelar, crear o cerrar tareas, lecciones y lazos, y decidir o comentar " +
+  "tarjetas se rechazan.";
 
 async function handleMcp(req, res, niv = nivel(bearer(req))) {
   if (!niv) {
